@@ -1,0 +1,44 @@
+name: Build SQL project with code analysis
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'FabricWorkspace/AdventureWorks.SQLDatabase/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'FabricWorkspace/AdventureWorks.SQLDatabase/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - name: Setup code analysis on project
+      working-directory: UtilityScripts
+      run: |
+        pwsh SetupSqlCodeAnalysis.ps1 -SqlProjectFile "../FabricWorkspace/AdventureWorks.SQLDatabase/AdventureWorks.sqlproj" -SqlCodeAnalysisRulesFile "SqlCodeAnalysis.config"
+
+    - name: Add extra rules
+      working-directory: FabricWorkspace/AdventureWorks.SQLDatabase
+      run: |
+        dotnet add package ErikEJ.DacFX.SqlServer.Rules --version 1.3.0
+    - name: Build project
+      working-directory: FabricWorkspace/AdventureWorks.SQLDatabase
+      continue-on-error: true
+      run: |
+        dotnet build > buildoutput.log
+
+    - name: Parse code analysis results
+      working-directory: UtilityScripts
+      run: |
+        pwsh CodeAnalysisOutput.ps1 -BuildOutputFile "../FabricWorkspace/AdventureWorks.SQLDatabase/buildoutput.log"
+    - name: Output step summary
+      run: |
+        cat UtilityScripts/CodeAnalysisWarnings.md >> $GITHUB_STEP_SUMMARY
